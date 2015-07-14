@@ -33,3 +33,6 @@ glusterfs::volumes:
     replica: 2
     brick: ["%{ipaddress}:/data/glusterfs", "10.1.1.1:/data/glusterfs"]
 ```
+
+Note: I have wrapped the system calls with statsd calls to localhost:8125
+bit messy at the moment....
