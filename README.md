@@ -34,5 +34,29 @@ glusterfs::volumes:
     brick: ["%{ipaddress}:/data/glusterfs", "10.1.1.1:/data/glusterfs"]
 ```
 
-Note: I have wrapped the system calls with statsd calls to localhost:8125
-bit messy at the moment....
+Local changes
+=============
+
+We experienced a race condition where a server had not completed installation of glusterfs before the volume creation attempt was made.
+A simple 10 second sleep was inserted to mitigate. Not so much fixing the issue as putting lipstick on it..
+
+Statsd beaconing was implemented around the glusterfs system calls in line with policy of instrumenting all teh things
+
+```ruby
+require 'statsd'
+
+  $statsd = Statsd.new 'localhost', 8125
+
+  def self.instances
+    sleep 10
+    $statsd.time('deployment.glusterfs.peerstatus') {
+      glusterfs('peer','status').split(/\n/).collect do |line|
+        if line =~ /Hostname:\s(\S+)$/
+          new(:name => $1)
+        else
+          raise Puppet::Error, "Cannot parse invalid peer line: #{line}"
+        end
+      end
+    }
+  end
+```
