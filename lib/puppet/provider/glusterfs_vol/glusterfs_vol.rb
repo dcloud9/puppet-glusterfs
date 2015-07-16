@@ -1,18 +1,23 @@
 require 'puppet'
+require 'statsd'
+
 Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
+
+  $statsd = Statsd.new 'localhost', 8125
 
   commands :glusterfs => 'gluster'
   defaultfor :feature => :posix
 
   def create
+    sleep 10
     opts = ['volume', 'create', resource[:name]]
     if resource[:stripe] then
-      opts << "stripe" 
+      opts << "stripe"
       opts << resource[:stripe]
     end
-    
+
     if resource[:replica] then
-      opts << "replica" 
+      opts << "replica"
       opts << resource[:replica]
     end
 
@@ -33,14 +38,18 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
       volinfo = glusterfs('volume', 'info', resource[:name])
     rescue Exception => e
       self.debug "Volume does not exist, creating it"
-      glusterfs(opts)
-      glusterfs('volume', 'start', resource[:name])
+      $statsd.time('deployment.glusterfs.create') {
+        glusterfs(opts)
+        glusterfs('volume', 'start', resource[:name])
+      }
     end
 
     case volinfo
       when /Status: Stopped/
         self.debug "Starting volume"
-        glusterfs('volume', 'start', resource[:name])
+        $statsd.time('deployment.glusterfs.create') {
+          glusterfs('volume', 'start', resource[:name])
+        }
     end
   end
 
@@ -55,7 +64,9 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
 
   def exists?
     begin
-      volinfo = glusterfs('volume', 'info', resource[:name])
+      $statsd.time('deployment.glusterfs.exists') {
+        volinfo = glusterfs('volume', 'info', resource[:name])
+      }
     rescue Exception => e
       #self.debug e.message
       #self.debug e.backtrace
@@ -65,12 +76,12 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
     self.debug "Checking for missing bricks"
     opts = []
     if resource[:stripe] then
-      opts << "stripe" 
+      opts << "stripe"
       opts << resource[:stripe]
     end
-    
+
     if resource[:replica] then
-      opts << "replica" 
+      opts << "replica"
       opts << resource[:replica]
     end
 
@@ -79,7 +90,7 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
       resource[:brick] = [ resource[:brick] ]
     end
     resource[:brick].map do |brick|
-      if not volinfo =~ /Brick\d+:\s#{Regexp.escape(brick)}/ 
+      if not volinfo =~ /Brick\d+:\s#{Regexp.escape(brick)}/
         self.debug "#{brick} is missing from the volume"
         missing_brick << brick
       end
