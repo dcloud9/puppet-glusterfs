@@ -1,9 +1,6 @@
 require 'puppet'
-require 'statsd'
 
 Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
-
-  $statsd = Statsd.new 'localhost', 8125
 
   commands :glusterfs => 'gluster'
   defaultfor :feature => :posix
@@ -38,18 +35,14 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
       volinfo = glusterfs('volume', 'info', resource[:name])
     rescue Exception => e
       self.debug "Volume does not exist, creating it"
-      $statsd.time('deployment.glusterfs.create') {
-        glusterfs(opts)
-        glusterfs('volume', 'start', resource[:name])
-      }
+      glusterfs(opts)
+      glusterfs('volume', 'start', resource[:name])
     end
 
     case volinfo
       when /Status: Stopped/
         self.debug "Starting volume"
-        $statsd.time('deployment.glusterfs.create') {
-          glusterfs('volume', 'start', resource[:name])
-        }
+        glusterfs('volume', 'start', resource[:name])
     end
   end
 
@@ -64,12 +57,8 @@ Puppet::Type.type(:glusterfs_vol).provide(:glusterfs) do
 
   def exists?
     begin
-      $statsd.time('deployment.glusterfs.exists') {
-        volinfo = glusterfs('volume', 'info', resource[:name])
-      }
+      volinfo = glusterfs('volume', 'info', resource[:name])
     rescue Exception => e
-      #self.debug e.message
-      #self.debug e.backtrace
       return false
     end
 
